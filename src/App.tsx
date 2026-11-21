@@ -1,10 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
-  Activity, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, CalendarDays,
-  Check, ChevronDown, CircleHelp, Clock3, Command, FileImage, Home,
-  Instagram, LayoutGrid, Link2, LoaderCircle, LockKeyhole, LogOut,
-  Menu, MessageSquareText, Plus, Send, Settings2, ShieldCheck,
-  Sparkles, WandSparkles, X
+  Activity, ArrowRight, ArrowUpRight, Bell, CalendarDays, ChevronDown,
+  CircleHelp, Clock3, FileImage, Home, Instagram, LayoutGrid, Link2,
+  LoaderCircle, LogOut, Menu, MessageSquareText, Plus, Send, Settings2,
+  ShieldCheck, Sparkles, WandSparkles
 } from "lucide-react";
 import { ID, Models } from "appwrite";
 import { account, appwriteConfigured, appwriteConfigurationHint } from "./lib/appwrite";
