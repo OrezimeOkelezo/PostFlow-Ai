@@ -1,7 +1,9 @@
 import { Account, Client } from "appwrite";
 
-const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT?.trim();
-const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID?.trim();
+// These two values are public Appwrite client configuration, not secrets.
+// Environment variables may override them for another deployment.
+const endpoint = import.meta.env.VITE_APPWRITE_ENDPOINT?.trim() || "https://nyc.cloud.appwrite.io/v1";
+const projectId = import.meta.env.VITE_APPWRITE_PROJECT_ID?.trim() || "6b020f72000d66a17d23";
 
 export const appwriteConfigured = Boolean(
   endpoint &&
@@ -12,12 +14,12 @@ export const appwriteConfigured = Boolean(
 
 export const client = new Client();
 
-if (appwriteConfigured && endpoint && projectId) {
+if (appwriteConfigured) {
   client.setEndpoint(endpoint).setProject(projectId);
 }
 
 export const account = new Account(client);
 
 export function appwriteConfigurationHint() {
-  return "Add your Appwrite regional endpoint and project ID to a local .env file, then add localhost and orezimeokelezo.github.io as Web platforms in Appwrite.";
+  return "The Appwrite project settings are not configured. Add the regional endpoint and project ID to your local .env file.";
 }
