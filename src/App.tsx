@@ -1,11 +1,13 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import {
   Activity, ArrowRight, ArrowUpRight, Bell, CalendarDays, ChevronDown,
   CircleHelp, Clock3, FileImage, Home, Instagram, LayoutGrid, Link2,
   LoaderCircle, LogOut, Menu, MessageSquareText, Plus, Send, Settings2,
   ShieldCheck, Sparkles, WandSparkles
 } from "lucide-react";
-import { ID, Models } from "appwrite";
+import { ID } from "appwrite";
+import type { Models } from "appwrite";
 import { account, appwriteConfigured, appwriteConfigurationHint } from "./lib/appwrite";
 
 type AuthMode = "login" | "signup";
