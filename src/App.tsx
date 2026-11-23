@@ -9,6 +9,7 @@ import {
 import { ID } from "appwrite";
 import type { Models } from "appwrite";
 import { account, appwriteConfigured, appwriteConfigurationHint } from "./lib/appwrite";
+import ContentStudio from "./components/ContentStudio";
 
 type AuthMode = "login" | "signup";
 type Notice = { kind: "error" | "success" | "info"; text: string };
@@ -159,6 +160,8 @@ function Dashboard({ user, onSignOut }: { user: Models.User<Models.Preferences>;
               </section>
               <section className="panel activity-panel"><div className="panel-heading"><div><span className="eyebrow">YOUR WORKSPACE</span><h2>Recent activity</h2></div><button className="text-button" onClick={() => setActive("Calendar")}>Open calendar <ArrowRight size={14} /></button></div><div className="empty-activity"><span className="empty-icon"><Clock3 size={20} /></span><b>Your story starts here</b><p>Your drafts, scheduled posts and publishing updates will appear here.</p></div></section>
             </>
+          ) : active === "Content studio" ? (
+            <ContentStudio user={user} />
           ) : (
             <section className="section-placeholder panel"><span className="placeholder-icon"><LayoutGrid size={22} /></span><span className="eyebrow">POSTFLOW WORKSPACE</span><h1>{active}</h1><p>This section is part of the product roadmap. We're building it in stages so each feature connects properly to your Appwrite backend.</p><button className="secondary-button" onClick={() => setActive("Overview")}>Back to overview <ArrowRight size={15} /></button></section>
           )}
