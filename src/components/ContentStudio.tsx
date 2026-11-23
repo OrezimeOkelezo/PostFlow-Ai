@@ -65,9 +65,17 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
     }
     setAiBusy(true); setNotice("");
     try {
+      const brandResult = await db.listRows({ databaseId: DATABASE_ID, tableId: "brands", queries: [Query.equal("ownerId", user.$id), Query.limit(1)], ttl: 0 });
+      const brand = brandResult.rows[0] as unknown as { name?: string; description?: string; tone?: string } | undefined;
       const execution = await functions.createExecution({
         functionId: AI_FUNCTION_ID,
-        body: JSON.stringify({ idea: idea.trim(), platform: platforms[0] || "instagram" }),
+        body: JSON.stringify({
+          idea: idea.trim(),
+          platform: platforms[0] || "instagram",
+          brandName: brand?.name || "",
+          brandDescription: brand?.description || "",
+          tone: brand?.tone || "Friendly and helpful"
+        }),
         async: false
       });
       if (execution.status !== "completed") throw new Error("AI generation is still processing. Please try again.");
