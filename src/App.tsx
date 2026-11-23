@@ -118,7 +118,7 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: Models.User<M
   );
 }
 
-function Dashboard({ user, onSignOut }: { user: Models.User<Models.Preferences>; onSignOut: () => void }) {
+function Dashboard({ user, onSignOut, onUserUpdated }: { user: Models.User<Models.Preferences>; onSignOut: () => void; onUserUpdated: (user: Models.User<Models.Preferences>) => void }) {
   const [active, setActive] = useState("Overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dashboardPosts, setDashboardPosts] = useState<DashboardPost[]>([]);
@@ -191,7 +191,7 @@ function Dashboard({ user, onSignOut }: { user: Models.User<Models.Preferences>;
           ) : active === "Analytics" ? (
             <AnalyticsPage user={user} />
           ) : active === "Settings" ? (
-            <SettingsPage user={user} onUserUpdated={() => { void account.get().then(setUser); }} />
+            <SettingsPage user={user} onUserUpdated={onUserUpdated} />
           ) : (
             <section className="section-placeholder panel"><span className="placeholder-icon"><LayoutGrid size={22} /></span><span className="eyebrow">POSTFLOW WORKSPACE</span><h1>{active}</h1><p>This section is part of the product roadmap. We're building it in stages so each feature connects properly to your Appwrite backend.</p><button className="secondary-button" onClick={() => setActive("Overview")}>Back to overview <ArrowRight size={15} /></button></section>
           )}
@@ -232,6 +232,6 @@ export default function App() {
   }
 
   return user
-    ? <Dashboard user={user} onSignOut={signOut} />
+    ? <Dashboard user={user} onSignOut={signOut} onUserUpdated={setUser} />
     : <AuthScreen onAuthenticated={setUser} />;
 }
