@@ -68,9 +68,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
       const execution = await functions.createExecution({
         functionId: AI_FUNCTION_ID,
         body: JSON.stringify({ idea: idea.trim(), platform: platforms[0] || "instagram" }),
-        async: false,
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
+        async: false
       });
       if (execution.status !== "completed") throw new Error("AI generation is still processing. Please try again.");
       const result = JSON.parse(execution.responseBody || "{}");
