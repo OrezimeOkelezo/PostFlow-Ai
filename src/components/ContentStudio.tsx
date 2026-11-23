@@ -144,7 +144,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
       <section className="studio-card editor-card">
         <div className="studio-card-head"><div><span className="studio-kicker">NEW CONTENT</span><h2>Start with an idea</h2></div><span className="studio-icon"><Sparkles size={19}/></span></div>
         <label className="studio-label">What's the post about?<textarea value={idea} onChange={e=>setIdea(e.target.value)} placeholder="Example: Introduce our new collection and explain what makes it useful..." rows={3}/></label>
-        <button type="button" className="studio-assist" onClick={()=>void prepareBrief()} disabled={aiBusy}>{aiBusy?<LoaderCircle className="spin" size={16}/>:<Sparkles size={16}/>} {aiBusy?"Generating...":AI_FUNCTION_ID?"Generate with AI":"Prepare a starter draft"} <span>{AI_FUNCTION_ID?"AI configured":"Setup pending"}</span></button>
+        <button type="button" className="studio-assist" onClick={()=>void prepareBrief()} disabled={aiBusy}>{aiBusy?<LoaderCircle className="spin" size={16}/>:<Sparkles size={16}/>} {aiBusy?"Generating...":AI_FUNCTION_ID?"Generate with AI":"Prepare a starter draft"} <span>{AI_FUNCTION_ID?"Function deployed":"Setup pending"}</span></button>
         <form onSubmit={savePost} className="studio-form">
           <label className="studio-label">Post title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Give this post a name"/></label>
           <label className="studio-label">Caption<textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Write your caption here..." rows={7} required/></label>
