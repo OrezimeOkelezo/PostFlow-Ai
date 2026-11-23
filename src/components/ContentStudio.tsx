@@ -75,11 +75,11 @@ What do you think?`);
     try {
       let mediaFileId: string | null = null;
       if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: image, permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; uploadedMediaId = uploaded.$id; }
-      const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
+      const existingMediaId = editingId ? posts.find(item => item.$id === editingId)?.mediaFileId || null : null;\n      const data = { ownerId: user.$id, mediaFileId: mediaFileId || existingMediaId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
       const row = editingId
         ? await db.updateRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: editingId, data })
         : await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
-      setPosts(current => editingId ? current.map(item => item.$id === editingId ? row as unknown as Post : item) : [row as unknown as Post, ...current]);
+      if (editingId && uploadedMediaId && existingMediaId && uploadedMediaId !== existingMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: existingMediaId }); } catch { /* old media cleanup is best-effort */ } }\n      setPosts(current => editingId ? current.map(item => item.$id === editingId ? row as unknown as Post : item) : [row as unknown as Post, ...current]);
       setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
       setNotice(status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
     } catch (error) { if (uploadedMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: uploadedMediaId }); } catch { /* cleanup is best-effort */ } } setNotice("Could not save post: " + message(error)); }
