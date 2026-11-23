@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { ID, Permission, Query, Role, TablesDB } from "appwrite";
+import { ID, InputFile, Permission, Query, Role, Storage, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
 import { account, client, appwriteConfigured } from "../lib/appwrite";
 import { CalendarClock, Check, ChevronDown, Clock3, Copy, FileText, Hash, ImagePlus, Instagram, LoaderCircle, Save, Send, Sparkles, Trash2 } from "lucide-react";
 import "./studio.css";
 
-const db = new TablesDB(client);
+const db = new TablesDB(client);\nconst storage = new Storage(client);
 const DATABASE_ID = "postflow-main";
 const POSTS_TABLE_ID = "content_posts";
-type Post = Models.Row & { title?: string; caption?: string; hashtags?: string; status?: string; platforms?: string[]; scheduledAt?: string; ownerId: string };
+type Post = Models.Row & { mediaFileId?: string; title?: string; caption?: string; hashtags?: string; status?: string; platforms?: string[]; scheduledAt?: string; ownerId: string };
 
 function message(error: unknown) {
   return error && typeof error === "object" && "message" in error ? String((error as {message: unknown}).message) : "Something went wrong. Try again.";
@@ -22,7 +22,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");\n  const [image, setImage] = useState<File | null>(null);\n  const [imagePreview, setImagePreview] = useState("");
   const [status, setStatus] = useState<"draft" | "queued">("draft");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,7 +39,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   }
   useEffect(() => { void loadPosts(); }, [user.$id]);
 
-  const visiblePosts = useMemo(() => filter === "all" ? posts : posts.filter(post => post.status === filter), [posts, filter]);
+  useEffect(() => { if (!image) { setImagePreview(""); return; } const url = URL.createObjectURL(image); setImagePreview(url); return () => URL.revokeObjectURL(url); }, [image]);\n\n  const visiblePosts = useMemo(() => filter === "all" ? posts : posts.filter(post => post.status === filter), [posts, filter]);
 
   function togglePlatform(platform: string) {
     setPlatforms(current => current.includes(platform) ? current.filter(item => item !== platform) : [...current, platform]);
@@ -62,10 +62,10 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
     if (status === "queued" && new Date(scheduledAt).getTime() <= Date.now()) { setNotice("Choose a future date and time."); return; }
     setBusy(true); setNotice("");
     try {
-      const data = { ownerId: user.$id, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
+      let mediaFileId: string | null = null;\n      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: InputFile.fromBlob(image, image.name), permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; }\n      const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
       const row = await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
       setPosts(current => [row as Post, ...current]);
-      setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setStatus("draft");
+      setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
       setNotice(status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
     } catch (error) { setNotice("Could not save post: " + message(error)); }
     finally { setBusy(false); }
@@ -94,7 +94,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
           <label className="studio-label">Caption<textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Write your caption here..." rows={7} required/></label>
           <div className="studio-field-meta"><span>{caption.length} characters</span><button type="button" onClick={()=>void copyText(caption)} disabled={!caption}><Copy size={13}/> Copy caption</button></div>
           <label className="studio-label">Hashtags<input value={hashtags} onChange={e=>setHashtags(e.target.value)} placeholder="#YourBrand #YourTopic"/></label>
-          <div className="studio-label">Publish to</div>
+          <label className="studio-label">Post image (optional)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files?.[0]||null;if(file && file.size>10*1024*1024){setNotice("Choose an image smaller than 10 MB.");e.target.value="";return;}setImage(file);}} /></label>\n          <div className="studio-label">Publish to</div>
           <div className="platform-picks">
             <button type="button" className={platforms.includes("facebook")?"platform-pick chosen":"platform-pick"} onClick={()=>togglePlatform("facebook")}><span className="fb-letter">f</span> Facebook</button>
             <button type="button" className={platforms.includes("instagram")?"platform-pick chosen":"platform-pick"} onClick={()=>togglePlatform("instagram")}><Instagram size={17}/> Instagram</button>
@@ -108,7 +108,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
         <div className="studio-footnote">Scheduling stores your plan in the database. Automatic publishing will require an approved Meta integration and a secure background scheduler.</div>
       </section>
       <aside className="studio-side">
-        <section className="studio-card preview-card"><div className="studio-card-head"><div><span className="studio-kicker">LIVE PREVIEW</span><h2>Your post</h2></div><span className="preview-dot"/></div><div className="preview-social"><span className="preview-avatar">{(user.name||"P").slice(0,1).toUpperCase()}</span><span><b>{user.name||"Your brand"}</b><small>{platforms.map(p=>p==="instagram"?"Instagram":"Facebook").join(" · ")||"Choose a platform"}</small></span><ChevronDown size={15}/></div><div className="preview-image"><ImagePlus size={25}/><span>Image preview</span><small>Image uploads will be added with the media library</small></div><div className="preview-copy">{caption||"Your caption will appear here as you write it."}<p>{hashtags}</p></div><div className="preview-actions"><span>♡ Like</span><span>◯ Comment</span><span>↗ Share</span></div></section>
+        <section className="studio-card preview-card"><div className="studio-card-head"><div><span className="studio-kicker">LIVE PREVIEW</span><h2>Your post</h2></div><span className="preview-dot"/></div><div className="preview-social"><span className="preview-avatar">{(user.name||"P").slice(0,1).toUpperCase()}</span><span><b>{user.name||"Your brand"}</b><small>{platforms.map(p=>p==="instagram"?"Instagram":"Facebook").join(" · ")||"Choose a platform"}</small></span><ChevronDown size={15}/></div><div className="preview-image">{imagePreview?<img src={imagePreview} alt="Selected post preview"/>:<><ImagePlus size={25}/><span>Image preview</span><small>Choose an image above to preview it</small></>}</div><div className="preview-copy">{caption||"Your caption will appear here as you write it."}<p>{hashtags}</p></div><div className="preview-actions"><span>♡ Like</span><span>◯ Comment</span><span>↗ Share</span></div></section>
         <section className="studio-tip"><span><Clock3 size={17}/></span><div><b>A thoughtful posting rhythm</b><p>Plan a mix of useful, personal and promotional content. Review every post before enabling automatic publishing.</p></div></section>
       </aside>
     </div>
