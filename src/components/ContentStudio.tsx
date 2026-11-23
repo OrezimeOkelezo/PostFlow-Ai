@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { ID, Permission, Query, Role, Storage, TablesDB } from "appwrite";
+import { Functions, ID, Permission, Query, Role, Storage, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
 import { client, appwriteConfigured } from "../lib/appwrite";
 import { CalendarClock, ChevronDown, Clock3, Copy, FileText, ImagePlus, Instagram, LoaderCircle, Save, Sparkles, Trash2, Pencil } from "lucide-react";
@@ -8,6 +8,8 @@ import "./studio.css";
 
 const db = new TablesDB(client);
 const storage = new Storage(client);
+const functions = new Functions(client);
+const AI_FUNCTION_ID = import.meta.env.VITE_APPWRITE_AI_FUNCTION_ID?.trim() || "";
 const DATABASE_ID = "postflow-main";
 const POSTS_TABLE_ID = "content_posts";
 type Post = Models.Row & { mediaFileId?: string; title?: string; caption?: string; hashtags?: string; status?: string; platforms?: string[]; scheduledAt?: string; ownerId: string };
@@ -28,6 +30,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   const [imagePreview, setImagePreview] = useState("");
   const [status, setStatus] = useState<"draft" | "queued">("draft");
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("all");
@@ -51,17 +54,34 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
     setPlatforms(current => current.includes(platform) ? current.filter(item => item !== platform) : [...current, platform]);
   }
 
-  // This creates an editable writing brief, not an AI-generated result. A server-side AI provider is intentionally not simulated.
-  function prepareBrief() {
+  async function prepareBrief() {
     if (!idea.trim()) { setNotice("Describe your post idea first."); return; }
-    setTitle(title || idea.trim().slice(0, 80));
-    setCaption(`Here's an idea worth sharing: ${idea.trim()}
-
-Tell your audience why it matters, add one useful detail, and invite them to join the conversation.
-
-What do you think?`);
-    setHashtags("#YourBrand #ContentIdeas #Community");
-    setNotice("A starter draft is ready to edit. Live AI generation will be enabled after an AI provider key is configured securely.");
+    if (!AI_FUNCTION_ID) {
+      setTitle(title || idea.trim().slice(0, 80));
+      setCaption(`Here's an idea worth sharing: ${idea.trim()}\n\nTell your audience why it matters, add one useful detail, and invite them to join the conversation.\n\nWhat do you think?`);
+      setHashtags("#YourBrand #ContentIdeas #Community");
+      setNotice("Starter draft prepared. Live AI generation is waiting for the Appwrite Function and provider key.");
+      return;
+    }
+    setAiBusy(true); setNotice("");
+    try {
+      const execution = await functions.createExecution({
+        functionId: AI_FUNCTION_ID,
+        body: JSON.stringify({ idea: idea.trim(), platform: platforms[0] || "instagram" }),
+        async: false,
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      if (execution.status !== "completed") throw new Error("AI generation is still processing. Please try again.");
+      const result = JSON.parse(execution.responseBody || "{}");
+      if (!result.caption) throw new Error(result.error || "The AI function did not return a caption.");
+      setTitle(result.title || title || idea.trim().slice(0, 80));
+      setCaption(result.caption);
+      setHashtags(Array.isArray(result.hashtags) ? result.hashtags.join(" ") : "");
+      setNotice("AI draft generated. Review and edit it before saving.");
+    } catch (error) {
+      setNotice("AI generation failed: " + message(error));
+    } finally { setAiBusy(false); }
   }
 
   async function savePost(event: FormEvent<HTMLFormElement>) {
@@ -75,13 +95,15 @@ What do you think?`);
     try {
       let mediaFileId: string | null = null;
       if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: image, permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; uploadedMediaId = uploaded.$id; }
-      const existingMediaId = editingId ? posts.find(item => item.$id === editingId)?.mediaFileId || null : null;\n      const data = { ownerId: user.$id, mediaFileId: mediaFileId || existingMediaId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
+      const existingMediaId = editingId ? posts.find(item => item.$id === editingId)?.mediaFileId || null : null;
+      const data = { ownerId: user.$id, mediaFileId: mediaFileId || existingMediaId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
       const row = editingId
         ? await db.updateRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: editingId, data })
         : await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
-      if (editingId && uploadedMediaId && existingMediaId && uploadedMediaId !== existingMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: existingMediaId }); } catch { /* old media cleanup is best-effort */ } }\n      setPosts(current => editingId ? current.map(item => item.$id === editingId ? row as unknown as Post : item) : [row as unknown as Post, ...current]);
-      setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
-      setNotice(status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
+      if (editingId && uploadedMediaId && existingMediaId && uploadedMediaId !== existingMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: existingMediaId }); } catch { /* old media cleanup is best-effort */ } }
+      setPosts(current => editingId ? current.map(item => item.$id === editingId ? row as unknown as Post : item) : [row as unknown as Post, ...current]);
+      const wasEditing = Boolean(editingId); setEditingId(null); setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
+      setNotice(wasEditing ? "Post updated." : status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
     } catch (error) { if (uploadedMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: uploadedMediaId }); } catch { /* cleanup is best-effort */ } } setNotice("Could not save post: " + message(error)); }
     finally { setBusy(false); }
   }
@@ -116,7 +138,7 @@ What do you think?`);
       <section className="studio-card editor-card">
         <div className="studio-card-head"><div><span className="studio-kicker">NEW CONTENT</span><h2>Start with an idea</h2></div><span className="studio-icon"><Sparkles size={19}/></span></div>
         <label className="studio-label">What's the post about?<textarea value={idea} onChange={e=>setIdea(e.target.value)} placeholder="Example: Introduce our new collection and explain what makes it useful..." rows={3}/></label>
-        <button type="button" className="studio-assist" onClick={prepareBrief}><Sparkles size={16}/> Prepare a starter draft <span>Not live AI yet</span></button>
+        <button type="button" className="studio-assist" onClick={()=>void prepareBrief()} disabled={aiBusy}>{aiBusy?<LoaderCircle className="spin" size={16}/>:<Sparkles size={16}/>} {aiBusy?"Generating...":AI_FUNCTION_ID?"Generate with AI":"Prepare a starter draft"} <span>{AI_FUNCTION_ID?"AI configured":"Setup pending"}</span></button>
         <form onSubmit={savePost} className="studio-form">
           <label className="studio-label">Post title<input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Give this post a name"/></label>
           <label className="studio-label">Caption<textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Write your caption here..." rows={7} required/></label>
@@ -132,7 +154,8 @@ What do you think?`);
           <div className="publish-choice"><button type="button" className={status==="draft"?"choice active":"choice"} onClick={()=>setStatus("draft")}><FileText size={15}/> Save as draft</button><button type="button" className={status==="queued"?"choice active":"choice"} onClick={()=>setStatus("queued")}><CalendarClock size={15}/> Schedule</button></div>
           {status==="queued" && <label className="studio-label">Scheduled date and time<input type="datetime-local" value={scheduledAt} onChange={e=>setScheduledAt(e.target.value)} min={new Date(Date.now()+60000).toISOString().slice(0,16)} /></label>}
           {notice && <div className="studio-notice" role="status">{notice}</div>}
-          {editingId && <button type="button" className="studio-field-meta" onClick={()=>{setEditingId(null);setTitle("");setCaption("");setHashtags("");setIdea("");setScheduledAt("");setImage(null);setStatus("draft");setNotice("Editing cancelled.");}}>Cancel editing</button>}\n          <button className="studio-save" type="submit" disabled={busy}>{busy?<LoaderCircle className="spin" size={16}/>:status==="queued"?<CalendarClock size={16}/>:<Save size={16}/>} {busy?"Saving...":editingId?"Update post":status==="queued"?"Save scheduled post":"Save draft"}</button>
+          {editingId && <button type="button" className="studio-field-meta" onClick={()=>{setEditingId(null);setTitle("");setCaption("");setHashtags("");setIdea("");setScheduledAt("");setImage(null);setStatus("draft");setNotice("Editing cancelled.");}}>Cancel editing</button>}\n          {editingId && <button type="button" className="studio-field-meta" onClick={()=>{setEditingId(null);setTitle("");setCaption("");setHashtags("");setIdea("");setScheduledAt("");setImage(null);setStatus("draft");setNotice("Editing cancelled.");}}>Cancel editing</button>}
+          <button className="studio-save" type="submit" disabled={busy}>{busy?<LoaderCircle className="spin" size={16}/>:status==="queued"?<CalendarClock size={16}/>:<Save size={16}/>} {busy?"Saving...":editingId?"Update post":status==="queued"?"Save scheduled post":"Save draft"}</button>
         </form>
         <div className="studio-footnote">Scheduling stores your plan in the database. Automatic publishing will require an approved Meta integration and a secure background scheduler.</div>
       </section>
