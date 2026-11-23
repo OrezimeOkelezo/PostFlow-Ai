@@ -6,7 +6,8 @@ import { client, appwriteConfigured } from "../lib/appwrite";
 import { CalendarClock, ChevronDown, Clock3, Copy, FileText, ImagePlus, Instagram, LoaderCircle, Save, Sparkles, Trash2 } from "lucide-react";
 import "./studio.css";
 
-const db = new TablesDB(client);\nconst storage = new Storage(client);
+const db = new TablesDB(client);
+const storage = new Storage(client);
 const DATABASE_ID = "postflow-main";
 const POSTS_TABLE_ID = "content_posts";
 type Post = Models.Row & { mediaFileId?: string; title?: string; caption?: string; hashtags?: string; status?: string; platforms?: string[]; scheduledAt?: string; ownerId: string };
@@ -22,7 +23,9 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   const [caption, setCaption] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [platforms, setPlatforms] = useState<string[]>(["instagram"]);
-  const [scheduledAt, setScheduledAt] = useState("");\n  const [image, setImage] = useState<File | null>(null);\n  const [imagePreview, setImagePreview] = useState("");
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [image, setImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [status, setStatus] = useState<"draft" | "queued">("draft");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -39,7 +42,9 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   }
   useEffect(() => { void loadPosts(); }, [user.$id]);
 
-  useEffect(() => { if (!image) { setImagePreview(""); return; } const url = URL.createObjectURL(image); setImagePreview(url); return () => URL.revokeObjectURL(url); }, [image]);\n\n  const visiblePosts = useMemo(() => filter === "all" ? posts : posts.filter(post => post.status === filter), [posts, filter]);
+  useEffect(() => { if (!image) { setImagePreview(""); return; } const url = URL.createObjectURL(image); setImagePreview(url); return () => URL.revokeObjectURL(url); }, [image]);
+
+  const visiblePosts = useMemo(() => filter === "all" ? posts : posts.filter(post => post.status === filter), [posts, filter]);
 
   function togglePlatform(platform: string) {
     setPlatforms(current => current.includes(platform) ? current.filter(item => item !== platform) : [...current, platform]);
@@ -49,7 +54,11 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   function prepareBrief() {
     if (!idea.trim()) { setNotice("Describe your post idea first."); return; }
     setTitle(title || idea.trim().slice(0, 80));
-    setCaption(`Here's an idea worth sharing: ${idea.trim()}\n\nTell your audience why it matters, add one useful detail, and invite them to join the conversation.\n\nWhat do you think?`);
+    setCaption(`Here's an idea worth sharing: ${idea.trim()}
+
+Tell your audience why it matters, add one useful detail, and invite them to join the conversation.
+
+What do you think?`);
     setHashtags("#YourBrand #ContentIdeas #Community");
     setNotice("A starter draft is ready to edit. Live AI generation will be enabled after an AI provider key is configured securely.");
   }
@@ -62,7 +71,9 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
     if (status === "queued" && new Date(scheduledAt).getTime() <= Date.now()) { setNotice("Choose a future date and time."); return; }
     setBusy(true); setNotice("");
     try {
-      let mediaFileId: string | null = null;\n      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: InputFile.fromBlob(image, image.name), permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; }\n      const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
+      let mediaFileId: string | null = null;
+      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: InputFile.fromBlob(image, image.name), permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; }
+      const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
       const row = await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
       setPosts(current => [row as Post, ...current]);
       setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
@@ -94,7 +105,8 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
           <label className="studio-label">Caption<textarea value={caption} onChange={e=>setCaption(e.target.value)} placeholder="Write your caption here..." rows={7} required/></label>
           <div className="studio-field-meta"><span>{caption.length} characters</span><button type="button" onClick={()=>void copyText(caption)} disabled={!caption}><Copy size={13}/> Copy caption</button></div>
           <label className="studio-label">Hashtags<input value={hashtags} onChange={e=>setHashtags(e.target.value)} placeholder="#YourBrand #YourTopic"/></label>
-          <label className="studio-label">Post image (optional)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files?.[0]||null;if(file && file.size>10*1024*1024){setNotice("Choose an image smaller than 10 MB.");e.target.value="";return;}setImage(file);}} /></label>\n          <div className="studio-label">Publish to</div>
+          <label className="studio-label">Post image (optional)<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e=>{const file=e.target.files?.[0]||null;if(file && file.size>10*1024*1024){setNotice("Choose an image smaller than 10 MB.");e.target.value="";return;}setImage(file);}} /></label>
+          <div className="studio-label">Publish to</div>
           <div className="platform-picks">
             <button type="button" className={platforms.includes("facebook")?"platform-pick chosen":"platform-pick"} onClick={()=>togglePlatform("facebook")}><span className="fb-letter">f</span> Facebook</button>
             <button type="button" className={platforms.includes("instagram")?"platform-pick chosen":"platform-pick"} onClick={()=>togglePlatform("instagram")}><Instagram size={17}/> Instagram</button>
