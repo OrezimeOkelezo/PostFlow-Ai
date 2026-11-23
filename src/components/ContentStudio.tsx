@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { ID, Permission, Query, Role, Storage, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
 import { client, appwriteConfigured } from "../lib/appwrite";
-import { CalendarClock, ChevronDown, Clock3, Copy, FileText, ImagePlus, Instagram, LoaderCircle, Save, Sparkles, Trash2 } from "lucide-react";
+import { CalendarClock, ChevronDown, Clock3, Copy, FileText, ImagePlus, Instagram, LoaderCircle, Save, Sparkles, Trash2, Pencil } from "lucide-react";
 import "./studio.css";
 
 const db = new TablesDB(client);
@@ -31,6 +31,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function loadPosts() {
     if (!appwriteConfigured) { setLoading(false); return; }
@@ -75,12 +76,27 @@ What do you think?`);
       let mediaFileId: string | null = null;
       if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: image, permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; uploadedMediaId = uploaded.$id; }
       const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
-      const row = await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
-      setPosts(current => [row as unknown as Post, ...current]);
+      const row = editingId
+        ? await db.updateRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: editingId, data })
+        : await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
+      setPosts(current => editingId ? current.map(item => item.$id === editingId ? row as unknown as Post : item) : [row as unknown as Post, ...current]);
       setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
       setNotice(status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
     } catch (error) { if (uploadedMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: uploadedMediaId }); } catch { /* cleanup is best-effort */ } } setNotice("Could not save post: " + message(error)); }
     finally { setBusy(false); }
+  }
+
+  function editPost(post: Post) {
+    setEditingId(post.$id);
+    setTitle(post.title||"");
+    setIdea("");
+    setCaption(post.caption||"");
+    setHashtags(post.hashtags||"");
+    setPlatforms(post.platforms||[]);
+    setStatus(post.status==="queued"?"queued":"draft");
+    setScheduledAt(post.scheduledAt?new Date(post.scheduledAt).toISOString().slice(0,16):"");
+    setNotice("Editing saved post. Save changes when ready.");
+    window.scrollTo({top:0,behavior:"smooth"});
   }
 
   async function deletePost(id: string) {
@@ -116,7 +132,7 @@ What do you think?`);
           <div className="publish-choice"><button type="button" className={status==="draft"?"choice active":"choice"} onClick={()=>setStatus("draft")}><FileText size={15}/> Save as draft</button><button type="button" className={status==="queued"?"choice active":"choice"} onClick={()=>setStatus("queued")}><CalendarClock size={15}/> Schedule</button></div>
           {status==="queued" && <label className="studio-label">Scheduled date and time<input type="datetime-local" value={scheduledAt} onChange={e=>setScheduledAt(e.target.value)} min={new Date(Date.now()+60000).toISOString().slice(0,16)} /></label>}
           {notice && <div className="studio-notice" role="status">{notice}</div>}
-          <button className="studio-save" type="submit" disabled={busy}>{busy?<LoaderCircle className="spin" size={16}/>:status==="queued"?<CalendarClock size={16}/>:<Save size={16}/>} {busy?"Saving...":status==="queued"?"Save scheduled post":"Save draft"}</button>
+          {editingId && <button type="button" className="studio-field-meta" onClick={()=>{setEditingId(null);setTitle("");setCaption("");setHashtags("");setIdea("");setScheduledAt("");setImage(null);setStatus("draft");setNotice("Editing cancelled.");}}>Cancel editing</button>}\n          <button className="studio-save" type="submit" disabled={busy}>{busy?<LoaderCircle className="spin" size={16}/>:status==="queued"?<CalendarClock size={16}/>:<Save size={16}/>} {busy?"Saving...":editingId?"Update post":status==="queued"?"Save scheduled post":"Save draft"}</button>
         </form>
         <div className="studio-footnote">Scheduling stores your plan in the database. Automatic publishing will require an approved Meta integration and a secure background scheduler.</div>
       </section>
@@ -126,7 +142,7 @@ What do you think?`);
       </aside>
     </div>
     <section className="studio-card saved-posts"><div className="saved-head"><div><span className="studio-kicker">YOUR LIBRARY</span><h2>Saved content</h2></div><div className="saved-filters">{["all","draft","queued","published"].map(item=><button key={item} className={filter===item?"filter-active":""} onClick={()=>setFilter(item)}>{item==="all"?"All":item[0].toUpperCase()+item.slice(1)}</button>)}</div></div>
-      {loading?<div className="saved-empty"><LoaderCircle className="spin"/> Loading your posts...</div>:visiblePosts.length===0?<div className="saved-empty"><FileText size={22}/><b>No saved posts here yet</b><span>Your drafts and scheduled posts will appear here.</span></div>:<div className="saved-list">{visiblePosts.map(post=><article className="saved-row" key={post.$id}><div className="saved-post-icon"><FileText size={17}/></div><div className="saved-post-main"><b>{post.title||"Untitled post"}</b><p>{post.caption||"No caption"}</p><small>{(post.platforms||[]).join(" · ")} {post.scheduledAt?" · "+new Date(post.scheduledAt).toLocaleString():""}</small></div><span className={"post-status status-"+post.status}>{post.status||"draft"}</span><button type="button" className="delete-post" onClick={()=>void deletePost(post.$id)} aria-label="Delete post"><Trash2 size={16}/></button></article>)}</div>}
+      {loading?<div className="saved-empty"><LoaderCircle className="spin"/> Loading your posts...</div>:visiblePosts.length===0?<div className="saved-empty"><FileText size={22}/><b>No saved posts here yet</b><span>Your drafts and scheduled posts will appear here.</span></div>:<div className="saved-list">{visiblePosts.map(post=><article className="saved-row" key={post.$id}><div className="saved-post-icon"><FileText size={17}/></div><div className="saved-post-main"><b>{post.title||"Untitled post"}</b><p>{post.caption||"No caption"}</p><small>{(post.platforms||[]).join(" · ")} {post.scheduledAt?" · "+new Date(post.scheduledAt).toLocaleString():""}</small></div><span className={"post-status status-"+post.status}>{post.status||"draft"}</span><button type="button" className="delete-post" onClick={()=>editPost(post)} aria-label="Edit post"><Pencil size={15}/></button><button type="button" className="delete-post" onClick={()=>void deletePost(post.$id)} aria-label="Delete post"><Trash2 size={16}/></button></article>)}</div>}
     </section>
   </div>;
 }
