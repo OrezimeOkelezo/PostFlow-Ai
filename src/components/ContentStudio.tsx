@@ -134,7 +134,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
     setHashtags(post.hashtags||"");
     setPlatforms(post.platforms||[]);
     setStatus(post.status==="queued"?"queued":"draft");
-    setScheduledAt(post.scheduledAt?new Date(post.scheduledAt).toISOString().slice(0,16):"");
+    setScheduledAt(post.scheduledAt?(()=>{const d=new Date(post.scheduledAt!);const pad=(n:number)=>String(n).padStart(2,"0");return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;})():"");
     setNotice("Editing saved post. Save changes when ready.");
     window.scrollTo({top:0,behavior:"smooth"});
   }
