@@ -41,14 +41,14 @@ Add Web platforms for `localhost` and `orezimeokelezo.github.io` in Appwrite Con
 
 ## Important feature boundaries
 
-- The Content Studio can call the optional Appwrite AI Function in `functions/generate-content`. The function source is in GitHub but still needs to be created and deployed in Appwrite and supplied with a server-side `OPENAI_API_KEY`. Until then, the editor creates clearly labelled starter copy, not live AI output.
+- The Content Studio can call the optional Appwrite AI Function in `functions/generate-content`. The Appwrite Function `postflow-ai-content` has been created and its deployment built successfully. It still needs a server-side `OPENAI_API_KEY` secret in Appwrite before live AI generation will work. Until then, the editor creates clearly labelled starter copy, not live AI output.
 - Saving a scheduled post stores its intended date and time. It does **not** publish automatically yet.
 - Image uploads are stored privately in Appwrite Storage and linked to the saved post.
 - Facebook and Instagram connection, OAuth token handling, automatic publishing, AI image generation, analytics and trend feeds are not enabled until their provider credentials, server-side functions and platform approvals are configured.
 
 ## Next production integrations
 
-1. Deploy `functions/generate-content` as an Appwrite Node.js 22 Function and add `OPENAI_API_KEY` as a secret. Set the public function ID in `VITE_APPWRITE_AI_FUNCTION_ID`. Never place provider keys in `VITE_*` variables or browser code.
+1. Add `OPENAI_API_KEY` as a secret environment variable to the existing Appwrite Function `postflow-ai-content`. The frontend already targets this function by default; `VITE_APPWRITE_AI_FUNCTION_ID` can override it. Never place provider keys in `VITE_*` variables or browser code.
 2. Register a Meta developer app, configure OAuth redirect URLs and request the permissions required for Facebook Pages and Instagram professional accounts.
 3. Complete Meta review and any required business / platform verification before enabling multi-customer publishing.
 4. Deploy a durable server-side scheduler that processes due posts, handles retries safely and records publication outcomes.
