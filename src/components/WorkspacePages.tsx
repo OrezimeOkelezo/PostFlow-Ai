@@ -120,7 +120,7 @@ export function SettingsPage({ user, onUserUpdated }: { user: Models.User<Models
     e.preventDefault();
     if(!brandName.trim()){setBrandNotice("Enter your brand name.");return;}
     setBrandBusy(true);setBrandNotice("");
-    const data={ownerId:user.$id,name:brandName.trim(),description:brandDescription.trim(),tone:brandTone,website:brandWebsite.trim(),createdAt:brand?.createdAt||new Date().toISOString()};
+    const data={ownerId:user.$id,name:brandName.trim(),description:brandDescription.trim(),tone:brandTone,website:brandWebsite.trim(),createdAt:brand?.$createdAt||new Date().toISOString()};
     try {
       if(brand){const updated=await db.updateRow({databaseId:DB_ID,tableId:BRANDS_TABLE_ID,rowId:brand.$id,data});setBrand(updated as unknown as Brand);}
       else {const created=await db.createRow({databaseId:DB_ID,tableId:BRANDS_TABLE_ID,rowId:ID.unique(),data,permissions:[Permission.read(Role.user(user.$id)),Permission.update(Role.user(user.$id)),Permission.delete(Role.user(user.$id))]});setBrand(created as unknown as Brand);}
