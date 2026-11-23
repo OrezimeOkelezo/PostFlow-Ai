@@ -70,21 +70,22 @@ What do you think?`);
     if (status === "queued" && !scheduledAt) { setNotice("Choose a date and time to schedule this post."); return; }
     if (status === "queued" && new Date(scheduledAt).getTime() <= Date.now()) { setNotice("Choose a future date and time."); return; }
     setBusy(true); setNotice("");
+    let uploadedMediaId: string | null = null;
     try {
       let mediaFileId: string | null = null;
-      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: image, permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; }
+      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: image, permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; uploadedMediaId = uploaded.$id; }
       const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
       const row = await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
       setPosts(current => [row as unknown as Post, ...current]);
       setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
       setNotice(status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
-    } catch (error) { setNotice("Could not save post: " + message(error)); }
+    } catch (error) { if (uploadedMediaId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: uploadedMediaId }); } catch { /* cleanup is best-effort */ } } setNotice("Could not save post: " + message(error)); }
     finally { setBusy(false); }
   }
 
   async function deletePost(id: string) {
     if (!window.confirm("Delete this saved post?")) return;
-    try { await db.deleteRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: id }); setPosts(current => current.filter(post => post.$id !== id)); }
+    try { const post = posts.find(item => item.$id === id); await db.deleteRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: id }); if (post?.mediaFileId) { try { await storage.deleteFile({ bucketId: "post-media", fileId: post.mediaFileId }); } catch { /* row is deleted; inaccessible orphan can be cleaned up by an admin */ } } setPosts(current => current.filter(item => item.$id !== id)); }
     catch (error) { setNotice("Could not delete post: " + message(error)); }
   }
 
