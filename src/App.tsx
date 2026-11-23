@@ -6,13 +6,19 @@ import {
   LoaderCircle, LogOut, Menu, MessageSquareText, Plus, Send, Settings2,
   ShieldCheck, Sparkles, WandSparkles
 } from "lucide-react";
-import { ID } from "appwrite";
+import { ID, Query, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
 import { account, appwriteConfigured, appwriteConfigurationHint } from "./lib/appwrite";
 import ContentStudio from "./components/ContentStudio";
+import { AccountsPage, AnalyticsPage, CalendarPage, IdeasPage, SettingsPage } from "./components/WorkspacePages";
+import { client } from "./lib/appwrite";
 
 type AuthMode = "login" | "signup";
 type Notice = { kind: "error" | "success" | "info"; text: string };
+
+const dashboardDb = new TablesDB(client);
+
+type DashboardPost = Models.Row & { ownerId: string; status?: string };
 
 const navItems = [
   { label: "Overview", icon: Home },
@@ -115,6 +121,20 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: Models.User<M
 function Dashboard({ user, onSignOut }: { user: Models.User<Models.Preferences>; onSignOut: () => void }) {
   const [active, setActive] = useState("Overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dashboardPosts, setDashboardPosts] = useState<DashboardPost[]>([]);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    if (!appwriteConfigured) { setDashboardLoading(false); return () => { alive = false; }; }
+    dashboardDb.listRows({ databaseId: "postflow-main", tableId: "content_posts", queries: [Query.equal("ownerId", user.$id), Query.limit(100)], ttl: 0 })
+      .then(result => { if (alive) setDashboardPosts(result.rows as unknown as DashboardPost[]); })
+      .catch(() => { if (alive) setDashboardPosts([]); })
+      .finally(() => { if (alive) setDashboardLoading(false); });
+    return () => { alive = false; };
+  }, [user.$id]);
+  const draftCount = dashboardPosts.filter(p => p.status === "draft").length;
+  const queuedCount = dashboardPosts.filter(p => p.status === "queued").length;
+  const publishedCount = dashboardPosts.filter(p => p.status === "published").length;
   const firstName = user.name?.trim().split(" ")[0] || "there";
   const initials = (user.name || user.email).slice(0, 1).toUpperCase();
 
@@ -149,10 +169,10 @@ function Dashboard({ user, onSignOut }: { user: Models.User<Models.Preferences>;
             <>
               <section className="welcome-row"><div><span className="eyebrow">YOUR CONTENT COMMAND CENTRE</span><h1>Good day, {firstName} <span className="wave">✦</span></h1><p>Here's the space where your next great post begins.</p></div><button className="primary-button" onClick={() => setActive("Content studio")}><Plus size={17} /> Create a post</button></section>
               <section className="stats-grid">
-                <article className="stat-card"><div className="stat-top"><span>Posts published</span><span className="stat-icon lavender"><Send size={17} /></span></div><strong>0</strong><small><span className="muted-dot" /> Ready for your first post</small></article>
-                <article className="stat-card"><div className="stat-top"><span>Scheduled posts</span><span className="stat-icon blue"><CalendarDays size={17} /></span></div><strong>0</strong><small><span className="muted-dot" /> Your calendar is clear</small></article>
-                <article className="stat-card"><div className="stat-top"><span>Connected channels</span><span className="stat-icon mint"><Link2 size={17} /></span></div><strong>0</strong><small><span className="muted-dot" /> Connect your first channel</small></article>
-                <article className="stat-card"><div className="stat-top"><span>Content ideas</span><span className="stat-icon peach"><Sparkles size={17} /></span></div><strong>0</strong><small><span className="muted-dot" /> Make room for inspiration</small></article>
+                <article className="stat-card"><div className="stat-top"><span>Posts published</span><span className="stat-icon lavender"><Send size={17} /></span></div><strong>{dashboardLoading ? "…" : publishedCount}</strong><small><span className="muted-dot" /> Published posts recorded</small></article>
+                <article className="stat-card"><div className="stat-top"><span>Scheduled posts</span><span className="stat-icon blue"><CalendarDays size={17} /></span></div><strong>{dashboardLoading ? "…" : queuedCount}</strong><small><span className="muted-dot" /> Saved scheduled posts</small></article>
+                <article className="stat-card"><div className="stat-top"><span>Connected channels</span><span className="stat-icon mint"><Link2 size={17} /></span></div><strong>0</strong><small><span className="muted-dot" /> No channels connected yet</small></article>
+                <article className="stat-card"><div className="stat-top"><span>Content ideas</span><span className="stat-icon peach"><Sparkles size={17} /></span></div><strong>{dashboardLoading ? "…" : draftCount}</strong><small><span className="muted-dot" /> Saved drafts</small></article>
               </section>
               <section className="dashboard-grid">
                 <article className="panel quick-create"><div className="panel-heading"><div><span className="eyebrow">START CREATING</span><h2>What are we sharing today?</h2><p>Bring your idea. We'll help shape it into a post.</p></div><span className="panel-heading-icon"><WandSparkles size={20} /></span></div><button className="create-prompt" onClick={() => setActive("Content studio")}><span><Sparkles size={17} /> Describe the post you have in mind...</span><span className="prompt-arrow"><ArrowUpRight size={17} /></span></button><div className="quick-options"><span><FileImage size={15} /> Image post</span><span><MessageSquareText size={15} /> Caption ideas</span><span><CalendarDays size={15} /> Plan content</span></div></article>
@@ -162,6 +182,16 @@ function Dashboard({ user, onSignOut }: { user: Models.User<Models.Preferences>;
             </>
           ) : active === "Content studio" ? (
             <ContentStudio user={user} />
+          ) : active === "Calendar" ? (
+            <CalendarPage user={user} />
+          ) : active === "Social accounts" ? (
+            <AccountsPage />
+          ) : active === "Ideas & trends" ? (
+            <IdeasPage onCreate={() => setActive("Content studio")} />
+          ) : active === "Analytics" ? (
+            <AnalyticsPage user={user} />
+          ) : active === "Settings" ? (
+            <SettingsPage user={user} onUserUpdated={() => { void account.get().then(setUser); }} />
           ) : (
             <section className="section-placeholder panel"><span className="placeholder-icon"><LayoutGrid size={22} /></span><span className="eyebrow">POSTFLOW WORKSPACE</span><h1>{active}</h1><p>This section is part of the product roadmap. We're building it in stages so each feature connects properly to your Appwrite backend.</p><button className="secondary-button" onClick={() => setActive("Overview")}>Back to overview <ArrowRight size={15} /></button></section>
           )}
