@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { ID, InputFile, Permission, Query, Role, Storage, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
-import { account, client, appwriteConfigured } from "../lib/appwrite";
-import { CalendarClock, Check, ChevronDown, Clock3, Copy, FileText, Hash, ImagePlus, Instagram, LoaderCircle, Save, Send, Sparkles, Trash2 } from "lucide-react";
+import { client, appwriteConfigured } from "../lib/appwrite";
+import { CalendarClock, ChevronDown, Clock3, Copy, FileText, ImagePlus, Instagram, LoaderCircle, Save, Sparkles, Trash2 } from "lucide-react";
 import "./studio.css";
 
 const db = new TablesDB(client);\nconst storage = new Storage(client);
