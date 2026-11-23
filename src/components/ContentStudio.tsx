@@ -9,7 +9,7 @@ import "./studio.css";
 const db = new TablesDB(client);
 const storage = new Storage(client);
 const functions = new Functions(client);
-const AI_FUNCTION_ID = import.meta.env.VITE_APPWRITE_AI_FUNCTION_ID?.trim() || "";
+const AI_FUNCTION_ID = import.meta.env.VITE_APPWRITE_AI_FUNCTION_ID?.trim() || "postflow-ai-content";
 const DATABASE_ID = "postflow-main";
 const POSTS_TABLE_ID = "content_posts";
 type Post = Models.Row & { mediaFileId?: string; title?: string; caption?: string; hashtags?: string; status?: string; platforms?: string[]; scheduledAt?: string; ownerId: string };
