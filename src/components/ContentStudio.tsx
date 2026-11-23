@@ -78,8 +78,20 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
         }),
         async: false
       });
-      if (execution.status !== "completed") throw new Error("AI generation is still processing. Please try again.");
-      const result = JSON.parse(execution.responseBody || "{}");
+      if (execution.status === "failed") {
+        let failure = "The Appwrite AI function failed.";
+        try {
+          const details = JSON.parse(execution.responseBody || "{}");
+          if (details.error) failure = details.error;
+        } catch { /* response may be empty for a platform-level failure */ }
+        if (execution.responseStatusCode === 503) failure = "Appwrite returned 503. The function runtime is temporarily unavailable. Please retry in a moment.";
+        throw new Error(failure);
+      }
+      if (execution.status !== "completed") throw new Error("AI generation is still processing. Wait a moment, then retry.");
+      let result: { title?: string; caption?: string; hashtags?: string[]; error?: string };
+      try { result = JSON.parse(execution.responseBody || "{}"); }
+      catch { throw new Error("The AI function returned an unreadable response."); }
+      if (execution.responseStatusCode && execution.responseStatusCode >= 400) throw new Error(result.error || `AI request failed (HTTP ${execution.responseStatusCode}).`);
       if (!result.caption) throw new Error(result.error || "The AI function did not return a caption.");
       setTitle(result.title || title || idea.trim().slice(0, 80));
       setCaption(result.caption);
