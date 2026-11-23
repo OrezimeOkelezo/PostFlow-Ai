@@ -46,13 +46,22 @@ export function CalendarPage({ user }: { user: Models.User<Models.Preferences> }
 }
 
 export function AccountsPage() {
-  return <div className="wp-page"><div className="wp-heading"><div><span className="wp-eyebrow">CHANNEL MANAGEMENT</span><h1>Social accounts</h1><p>Prepare the channels you want to manage from POSTFLOW AI.</p></div></div>
+  return <div className="wp-page"><div className="wp-heading"><div><span className="wp-eyebrow">CHANNEL MANAGEMENT</span><h1>Social accounts</h1><p>Connect your social channels through Meta's official authorization flow.</p></div></div>
+    <div className="wp-note"><LockKeyhole size={16}/><p>POSTFLOW AI will never ask for your Facebook or Instagram password. Account access must be granted on Meta's own authorization screen and stored securely on the server.</p></div>
     <div className="wp-account-grid">
-      <article className="wp-account-card"><div className="wp-account-icon facebook"><Facebook/></div><div className="wp-account-title"><h2>Facebook Pages</h2><span className="wp-state pending">Not connected</span></div><p>Connect a Facebook Page you manage. Publishing access requires Meta authorization and the relevant app permissions.</p><button disabled className="wp-disabled">Connection setup pending</button></article>
-      <article className="wp-account-card"><div className="wp-account-icon instagram"><Instagram/></div><div className="wp-account-title"><h2>Instagram</h2><span className="wp-state pending">Not connected</span></div><p>Instagram publishing is designed for eligible professional Business or Creator accounts with the required Meta setup.</p><button disabled className="wp-disabled">Connection setup pending</button></article>
+      <article className="wp-account-card"><div className="wp-account-icon facebook"><Facebook/></div><div className="wp-account-title"><h2>Facebook Pages</h2><span className="wp-state pending">Setup required</span></div><p>Connect a Facebook Page you manage. Meta app credentials, OAuth callback configuration and Page publishing permissions are required before the connection can be enabled.</p><button disabled className="wp-disabled">Waiting for Meta app setup</button></article>
+      <article className="wp-account-card"><div className="wp-account-icon instagram"><Instagram/></div><div className="wp-account-title"><h2>Instagram</h2><span className="wp-state pending">Setup required</span></div><p>Connect an eligible Instagram Business or Creator account through Meta. The account must meet Meta's professional-account and linking requirements.</p><button disabled className="wp-disabled">Waiting for Meta app setup</button></article>
     </div>
-    <div className="wp-callout"><LockKeyhole size={17}/><p><b>Your account security matters.</b> Social access tokens must be stored server-side. Do not paste passwords, API keys or access tokens into this page or into GitHub source code.</p></div>
-    <div className="wp-footnote">Meta OAuth, app review and publishing permissions have not yet been configured. This page does not claim any social account is connected.</div>
+    <section className="wp-card"><div className="wp-card-head"><div><span className="wp-eyebrow">NEXT CONFIGURATION</span><h2>Prepare the Meta connection</h2></div></div>
+      <ol className="wp-steps">
+        <li>Create a Meta developer app and add the Facebook Login and required Graph API products.</li>
+        <li>Configure the exact OAuth callback URL for the POSTFLOW AI Appwrite Function.</li>
+        <li>Store the Meta App ID, App Secret and callback settings as server-side Appwrite Function variables. Never put the App Secret in GitHub or a VITE_ variable.</li>
+        <li>Request the required permissions and complete Meta review before enabling publishing for other users.</li>
+      </ol>
+      <a className="wp-action-link" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">Open Meta for Developers <ArrowRight size={14}/></a>
+    </section>
+    <div className="wp-callout"><LockKeyhole size={17}/><p><b>Not connected yet.</b> The buttons remain disabled until the secure OAuth callback and token storage are configured and tested. This prevents a button from pretending an account is connected when it isn't.</p></div>
   </div>;
 }
 
