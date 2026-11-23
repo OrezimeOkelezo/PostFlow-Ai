@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Account, Query, TablesDB } from "appwrite";
+import { Account, ID, Permission, Query, Role, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
 import { Activity, ArrowRight, CalendarDays, CheckCircle2, Clock3, Facebook, Instagram, Lightbulb, LoaderCircle, LockKeyhole, RefreshCw, Settings2, Sparkles, UserRound } from "lucide-react";
 import { client, appwriteConfigured } from "../lib/appwrite";
@@ -9,6 +9,8 @@ const db = new TablesDB(client);
 const account = new Account(client);
 const DB_ID = "postflow-main";
 const TABLE_ID = "content_posts";
+const BRANDS_TABLE_ID = "brands";
+type Brand = Models.Row & { ownerId: string; name: string; description?: string; tone?: string; website?: string };
 type Post = Models.Row & { ownerId: string; title?: string; caption?: string; status?: string; platforms?: string[]; scheduledAt?: string; createdAt?: string };
 
 function usePosts(userId: string) {
@@ -86,6 +88,27 @@ export function SettingsPage({ user, onUserUpdated }: { user: Models.User<Models
   const [name,setName]=useState(user.name||"");
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
+  const [brand,setBrand]=useState<Brand|null>(null);
+  const [brandName,setBrandName]=useState("");
+  const [brandDescription,setBrandDescription]=useState("");
+  const [brandTone,setBrandTone]=useState("Friendly and helpful");
+  const [brandWebsite,setBrandWebsite]=useState("");
+  const [brandBusy,setBrandBusy]=useState(false);
+  const [brandNotice,setBrandNotice]=useState("");
+  const [brandLoading,setBrandLoading]=useState(true);
+
+  async function loadBrand() {
+    setBrandLoading(true);
+    try {
+      const result=await db.listRows({databaseId:DB_ID,tableId:BRANDS_TABLE_ID,queries:[Query.equal("ownerId",user.$id),Query.limit(1)],ttl:0});
+      const saved=result.rows[0] as unknown as Brand|undefined;
+      setBrand(saved||null);
+      if(saved){setBrandName(saved.name||"");setBrandDescription(saved.description||"");setBrandTone(saved.tone||"Friendly and helpful");setBrandWebsite(saved.website||"");}
+    } catch(err){setBrandNotice(err instanceof Error?err.message:"Could not load brand profile.");}
+    finally{setBrandLoading(false);}
+  }
+  useEffect(()=>{void loadBrand();},[user.$id]);
+
   async function save(e:React.FormEvent) {
     e.preventDefault(); if(!name.trim()){setNotice("Enter a name first.");return;}
     setBusy(true);setNotice("");
@@ -93,11 +116,34 @@ export function SettingsPage({ user, onUserUpdated }: { user: Models.User<Models
     catch(err){setNotice(err instanceof Error?err.message:"Could not update your profile.");}
     finally{setBusy(false);}
   }
-  return <div className="wp-page"><div className="wp-heading"><div><span className="wp-eyebrow">YOUR PREFERENCES</span><h1>Settings</h1><p>Manage your POSTFLOW AI profile.</p></div></div>
+  async function saveBrand(e:React.FormEvent) {
+    e.preventDefault();
+    if(!brandName.trim()){setBrandNotice("Enter your brand name.");return;}
+    setBrandBusy(true);setBrandNotice("");
+    const data={ownerId:user.$id,name:brandName.trim(),description:brandDescription.trim(),tone:brandTone,website:brandWebsite.trim(),createdAt:brand?.createdAt||new Date().toISOString()};
+    try {
+      if(brand){const updated=await db.updateRow({databaseId:DB_ID,tableId:BRANDS_TABLE_ID,rowId:brand.$id,data});setBrand(updated as unknown as Brand);}
+      else {const created=await db.createRow({databaseId:DB_ID,tableId:BRANDS_TABLE_ID,rowId:ID.unique(),data,permissions:[Permission.read(Role.user(user.$id)),Permission.update(Role.user(user.$id)),Permission.delete(Role.user(user.$id))]});setBrand(created as unknown as Brand);}
+      setBrandNotice("Brand profile saved.");
+    } catch(err){setBrandNotice(err instanceof Error?err.message:"Could not save brand profile.");}
+    finally{setBrandBusy(false);}
+  }
+  return <div className="wp-page"><div className="wp-heading"><div><span className="wp-eyebrow">YOUR PREFERENCES</span><h1>Settings</h1><p>Manage your account and brand identity.</p></div></div>
     <section className="wp-card wp-settings"><div className="wp-card-head"><div><span className="wp-eyebrow">PROFILE</span><h2>Account details</h2></div><span className="wp-heading-mark"><UserRound/></span></div>
       <form onSubmit={save}><label>Display name<input value={name} onChange={e=>setName(e.target.value)} maxLength={100}/></label><label>Email address<input value={user.email} disabled/></label><button className="wp-primary" disabled={busy}>{busy?<LoaderCircle className="spin" size={15}/>:null}Save profile</button>{notice&&<p className="wp-settings-notice">{notice}</p>}</form>
     </section>
-    <section className="wp-card wp-settings-info"><h2>Workspace configuration</h2><p>Database: <code>postflow-main</code></p><p>Content table: <code>content_posts</code></p><p>Media bucket: <code>post-media</code></p><p>Social publishing and AI provider credentials are not configured in the browser.</p></section>
-    <div className="wp-footnote">Account email changes, billing and workspace member management are not included in this release.</div>
+    <section className="wp-card wp-settings" style={{marginTop:14}}><div className="wp-card-head"><div><span className="wp-eyebrow">BRAND MEMORY</span><h2>Your brand profile</h2></div><span className="wp-heading-mark"><Sparkles/></span></div>
+      {brandLoading?<Empty icon={<LoaderCircle className="spin"/>} title="Loading brand" text="Checking your saved brand profile."/>:
+      <form onSubmit={saveBrand}>
+        <label>Brand or business name<input value={brandName} onChange={e=>setBrandName(e.target.value)} maxLength={128} placeholder="Your brand name" required/></label>
+        <label>What does your brand do?<textarea value={brandDescription} onChange={e=>setBrandDescription(e.target.value)} rows={3} placeholder="Describe your products, services and audience."/></label>
+        <label>Writing tone<select value={brandTone} onChange={e=>setBrandTone(e.target.value)}><option>Friendly and helpful</option><option>Professional and clear</option><option>Bold and energetic</option><option>Warm and conversational</option><option>Minimal and premium</option></select></label>
+        <label>Website<input type="url" value={brandWebsite} onChange={e=>setBrandWebsite(e.target.value)} placeholder="https://example.com"/></label>
+        <button className="wp-primary" disabled={brandBusy}>{brandBusy?<LoaderCircle className="spin" size={15}/>:null}{brand?"Update brand profile":"Save brand profile"}</button>
+        {brandNotice&&<p className="wp-settings-notice">{brandNotice}</p>}
+      </form>}
+    </section>
+    <section className="wp-card wp-settings-info"><h2>Workspace configuration</h2><p>Database: <code>postflow-main</code></p><p>Content table: <code>content_posts</code></p><p>Brand table: <code>brands</code></p><p>Media bucket: <code>post-media</code></p></section>
+    <div className="wp-footnote">Brand Memory is saved in your private workspace. AI generation and social publishing still require server-side provider integrations.</div>
   </div>;
 }
