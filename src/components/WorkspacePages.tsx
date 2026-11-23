@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Account, Query, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
-import { Activity, ArrowRight, CalendarDays, CheckCircle2, Clock3, Facebook, Instagram, Lightbulb, LoaderCircle, LockKeyhole, RefreshCw, Settings2, Sparkles, UserRound, XCircle } from "lucide-react";
+import { Activity, ArrowRight, CalendarDays, CheckCircle2, Clock3, Facebook, Instagram, Lightbulb, LoaderCircle, LockKeyhole, RefreshCw, Settings2, Sparkles, UserRound } from "lucide-react";
 import { client, appwriteConfigured } from "../lib/appwrite";
 import "./workspace-pages.css";
 
