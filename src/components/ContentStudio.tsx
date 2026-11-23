@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { ID, InputFile, Permission, Query, Role, Storage, TablesDB } from "appwrite";
+import { ID, Permission, Query, Role, Storage, TablesDB } from "appwrite";
 import type { Models } from "appwrite";
 import { client, appwriteConfigured } from "../lib/appwrite";
 import { CalendarClock, ChevronDown, Clock3, Copy, FileText, ImagePlus, Instagram, LoaderCircle, Save, Sparkles, Trash2 } from "lucide-react";
@@ -36,7 +36,7 @@ export default function ContentStudio({ user }: { user: Models.User<Models.Prefe
     if (!appwriteConfigured) { setLoading(false); return; }
     try {
       const result = await db.listRows({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, queries: [Query.equal("ownerId", user.$id), Query.orderDesc("$createdAt"), Query.limit(100)] });
-      setPosts(result.rows as Post[]);
+      setPosts(result.rows as unknown as Post[]);
     } catch (error) { setNotice("Could not load saved posts: " + message(error)); }
     finally { setLoading(false); }
   }
@@ -72,10 +72,10 @@ What do you think?`);
     setBusy(true); setNotice("");
     try {
       let mediaFileId: string | null = null;
-      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: InputFile.fromBlob(image, image.name), permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; }
+      if (image) { const uploaded = await storage.createFile({ bucketId: "post-media", fileId: ID.unique(), file: image, permissions: [Permission.read(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] }); mediaFileId = uploaded.$id; }
       const data = { ownerId: user.$id, mediaFileId, title: title.trim() || "Untitled post", caption: caption.trim(), hashtags: hashtags.trim(), status, platforms, scheduledAt: status === "queued" ? new Date(scheduledAt).toISOString() : null, createdAt: new Date().toISOString() };
       const row = await db.createRow({ databaseId: DATABASE_ID, tableId: POSTS_TABLE_ID, rowId: ID.unique(), data, permissions: [Permission.read(Role.user(user.$id)), Permission.update(Role.user(user.$id)), Permission.delete(Role.user(user.$id))] });
-      setPosts(current => [row as Post, ...current]);
+      setPosts(current => [row as unknown as Post, ...current]);
       setTitle(""); setIdea(""); setCaption(""); setHashtags(""); setScheduledAt(""); setImage(null); setStatus("draft");
       setNotice(status === "queued" ? "Scheduled post saved. Automatic publishing is not active yet." : "Draft saved to your Appwrite workspace.");
     } catch (error) { setNotice("Could not save post: " + message(error)); }
